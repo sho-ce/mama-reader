@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f4ee">
+  <title>Почитаю</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f4ee;
+      --card: #fffefa;
+      --text: #252721;
+      --muted: #6d7168;
+      --line: #dcded5;
+      --accent: #49654f;
+      --accent-soft: #e4ece3;
+      --danger: #9a4b47;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); }
+    button, textarea, select { font: inherit; }
+    button { cursor: pointer; }
+    .app { width: min(760px, 100%); margin: 0 auto; padding: 20px 16px 48px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 28px; }
+    h1 { margin: 0; font-size: clamp(1.65rem, 6vw, 2.2rem); }
+    h2 { margin: 0 0 16px; font-size: 1.35rem; }
+    .nav { display: flex; gap: 8px; }
+    .nav button, .tabs button { border: 0; border-radius: 999px; padding: 11px 15px; background: transparent; color: var(--muted); font-weight: 650; }
+    .nav button.active, .tabs button.active { color: var(--accent); background: var(--accent-soft); }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    textarea { width: 100%; min-height: 48vh; resize: vertical; padding: 18px; border: 1px solid var(--line); border-radius: 18px; background: var(--card); color: var(--text); font-size: 1.08rem; line-height: 1.55; outline: none; }
+    textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .primary { width: 100%; min-height: 54px; margin-top: 12px; border: 0; border-radius: 15px; padding: 14px 20px; background: var(--accent); color: white; font-weight: 750; font-size: 1.05rem; }
+    .primary:disabled { opacity: .45; cursor: default; }
+    .tabs { display: flex; gap: 6px; overflow-x: auto; margin: 0 -4px 18px; padding: 4px; }
+    .tabs button { flex: 0 0 auto; border: 1px solid transparent; }
+    .count { opacity: .7; }
+    .list { display: grid; gap: 12px; }
+    .empty { padding: 44px 18px; text-align: center; color: var(--muted); border: 1px dashed var(--line); border-radius: 18px; }
+    .note { padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); }
+    .note-title { margin: 0 0 6px; font-size: 1.06rem; }
+    .note-preview { margin: 0 0 14px; color: var(--muted); line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; }
+    .note-actions { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+    .secondary, .delete, select { min-height: 44px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--card); color: var(--text); }
+    .secondary { font-weight: 700; }
+    .delete { color: var(--danger); font-weight: 700; }
+    select { grid-column: 1 / -1; width: 100%; }
+    .reader { position: fixed; inset: 0; z-index: 10; overflow-y: auto; background: var(--card); display: none; }
+    .reader.open { display: block; }
+    .reader-inner { width: min(720px, 100%); min-height: 100%; margin: 0 auto; padding: 18px 18px 64px; }
+    .reader-bar { position: sticky; top: 0; display: flex; justify-content: space-between; gap: 10px; padding: 8px 0 18px; background: linear-gradient(var(--card) 75%, transparent); }
+    .reader-bar button { min-height: 46px; border-radius: 13px; padding: 10px 15px; font-weight: 700; }
+    .back { border: 1px solid var(--line); background: var(--card); color: var(--text); }
+    .save { border: 0; background: var(--accent); color: white; }
+    .save.saved { background: var(--accent-soft); color: var(--accent); }
+    .reader-text { margin: 22px 0 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(1.25rem, 4.7vw, 1.55rem); line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
+    @media (min-width: 640px) {
+      .app { padding-top: 34px; }
+      .note-actions { grid-template-columns: 1fr 1fr auto; }
+      select { grid-column: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <h1>Почитаю</h1>
+      <nav class="nav" aria-label="Основні розділи">
+        <button class="active" data-panel="write">Читати</button>
+        <button data-panel="notebook">Блокнот</button>
+      </nav>
+    </header>
+
+    <section id="write" class="panel active">
+      <textarea id="textInput" aria-label="Текст для читання" placeholder="Вставте сюди текст…"></textarea>
+      <button id="readButton" class="primary" disabled>Читати</button>
+    </section>
+
+    <section id="notebook" class="panel">
+      <h2>Блокнот</h2>
+      <div class="tabs" role="tablist" aria-label="Категорії блокнота">
+        <button class="active" data-category="todo">Треба пройти <span class="count" data-count="todo">0</span></button>
+        <button data-category="doing">Проходжу <span class="count" data-count="doing">0</span></button>
+        <button data-category="done">Пройдено <span class="count" data-count="done">0</span></button>
+      </div>
+      <div id="notesList" class="list"></div>
+    </section>
+  </main>
+
+  <section id="reader" class="reader" aria-hidden="true">
+    <div class="reader-inner">
+      <div class="reader-bar">
+        <button id="closeReader" class="back">← Назад</button>
+        <button id="saveNote" class="save">У блокнот</button>
+      </div>
+      <article id="readerText" class="reader-text"></article>
+    </div>
+  </section>
+
+  <script>
+    const STORAGE_KEY = 'pochytaiu-notes-v1';
+    const labels = { todo: 'Треба пройти', doing: 'Проходжу', done: 'Пройдено' };
+    const textInput = document.querySelector('#textInput');
+    const readButton = document.querySelector('#readButton');
+    const reader = document.querySelector('#reader');
+    const readerText = document.querySelector('#readerText');
+    const saveNote = document.querySelector('#saveNote');
+    const notesList = document.querySelector('#notesList');
+    let notes = loadNotes();
+    let activeCategory = 'todo';
+    let openNoteId = null;
+
+    function loadNotes() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        return Array.isArray(saved) ? saved : [];
+      } catch { return []; }
+    }
+
+    function persist() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
+      renderNotes();
+    }
+
+    function titleFrom(text) {
+      const firstLine = text.trim().split(/\n/)[0];
+      return firstLine.length > 55 ? firstLine.slice(0, 55) + '…' : firstLine;
+    }
+
+    function openReader(text, noteId = null) {
+      readerText.textContent = text;
+      openNoteId = noteId;
+      saveNote.textContent = noteId ? 'Збережено' : 'У блокнот';
+      saveNote.classList.toggle('saved', Boolean(noteId));
+      reader.classList.add('open');
+      reader.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+      reader.scrollTop = 0;
+    }
+
+    function closeReader() {
+      reader.classList.remove('open');
+      reader.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = '';
+    }
+
+    function renderNotes() {
+      document.querySelectorAll('[data-count]').forEach(el => {
+        el.textContent = notes.filter(note => note.category === el.dataset.count).length;
+      });
+      const visible = notes.filter(note => note.category === activeCategory);
+      notesList.replaceChildren();
+      if (!visible.length) {
+        const empty = document.createElement('div');
+        empty.className = 'empty';
+        empty.textContent = 'Тут поки порожньо';
+        notesList.append(empty);
+        return;
+      }
+      visible.forEach(note => {
+        const card = document.createElement('article');
+        card.className = 'note';
+        const title = document.createElement('h3');
+        title.className = 'note-title';
+        title.textContent = titleFrom(note.text);
+        const preview = document.createElement('p');
+        preview.className = 'note-preview';
+        preview.textContent = note.text;
+        const actions = document.createElement('div');
+        actions.className = 'note-actions';
+        const open = document.createElement('button');
+        open.className = 'secondary';
+        open.textContent = 'Відкрити';
+        open.addEventListener('click', () => openReader(note.text, note.id));
+        const select = document.createElement('select');
+        select.setAttribute('aria-label', 'Перенести в категорію');
+        Object.entries(labels).forEach(([value, label]) => {
+          const option = document.createElement('option');
+          option.value = value;
+          option.textContent = label;
+          option.selected = value === note.category;
+          select.append(option);
+        });
+        select.addEventListener('change', () => {
+          note.category = select.value;
+          persist();
+        });
+        const remove = document.createElement('button');
+        remove.className = 'delete';
+        remove.textContent = 'Видалити';
+        remove.addEventListener('click', () => {
+          if (confirm('Видалити цей текст?')) {
+            notes = notes.filter(item => item.id !== note.id);
+            persist();
+          }
+        });
+        actions.append(open, select, remove);
+        card.append(title, preview, actions);
+        notesList.append(card);
+      });
+    }
+
+    textInput.addEventListener('input', () => {
+      readButton.disabled = !textInput.value.trim();
+    });
+    readButton.addEventListener('click', () => openReader(textInput.value.trim()));
+    document.querySelector('#closeReader').addEventListener('click', closeReader);
+    saveNote.addEventListener('click', () => {
+      if (openNoteId) return;
+      const text = readerText.textContent.trim();
+      const note = { id: Date.now().toString(36) + Math.random().toString(36).slice(2), text, category: 'todo' };
+      notes.unshift(note);
+      openNoteId = note.id;
+      saveNote.textContent = 'Збережено';
+      saveNote.classList.add('saved');
+      persist();
+    });
+    document.querySelectorAll('.nav button').forEach(button => {
+      button.addEventListener('click', () => {
+        document.querySelectorAll('.nav button').forEach(item => item.classList.toggle('active', item === button));
+        document.querySelectorAll('.panel').forEach(panel => panel.classList.toggle('active', panel.id === button.dataset.panel));
+        if (button.dataset.panel === 'notebook') renderNotes();
+      });
+    });
+    document.querySelectorAll('.tabs button').forEach(button => {
+      button.addEventListener('click', () => {
+        activeCategory = button.dataset.category;
+        document.querySelectorAll('.tabs button').forEach(item => item.classList.toggle('active', item === button));
+        renderNotes();
+      });
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && reader.classList.contains('open')) closeReader();
+    });
+    renderNotes();
+  </script>
+</body>
+</html>
