@@ -51,8 +51,12 @@
     .reader { position: fixed; inset: 0; z-index: 10; overflow-y: auto; background: var(--card); display: none; }
     .reader.open { display: block; }
     .reader-inner { width: min(720px, 100%); min-height: 100%; margin: 0 auto; padding: 18px 18px 64px; }
-    .reader-bar { position: sticky; top: 0; display: flex; justify-content: space-between; gap: 10px; padding: 8px 0 18px; background: linear-gradient(var(--card) 75%, transparent); }
+    .reader-bar { position: sticky; top: 0; padding: 8px 0 18px; background: linear-gradient(var(--card) 88%, transparent); }
+    .reader-top, .speech-controls { display: flex; justify-content: space-between; gap: 10px; }
+    .speech-controls { margin-top: 10px; }
     .reader-bar button { min-height: 46px; border-radius: 13px; padding: 10px 15px; font-weight: 700; }
+    .speech-controls button { flex: 1; border: 1px solid var(--line); background: var(--card); color: var(--text); }
+    .speech-controls button:disabled { opacity: .45; cursor: default; }
     .back { border: 1px solid var(--line); background: var(--card); color: var(--text); }
     .save { border: 0; background: var(--accent); color: white; }
     .save.saved { background: var(--accent-soft); color: var(--accent); }
@@ -93,8 +97,14 @@
   <section id="reader" class="reader" aria-hidden="true">
     <div class="reader-inner">
       <div class="reader-bar">
-        <button id="closeReader" class="back">← Назад</button>
-        <button id="saveNote" class="save">У блокнот</button>
+        <div class="reader-top">
+          <button id="closeReader" class="back">← Назад</button>
+          <button id="saveNote" class="save">У блокнот</button>
+        </div>
+        <div class="speech-controls" aria-label="Керування озвученням">
+          <button id="pauseSpeech">Пауза</button>
+          <button id="stopSpeech">Зупинити</button>
+        </div>
       </div>
       <article id="readerText" class="reader-text"></article>
     </div>
@@ -108,10 +118,15 @@
     const reader = document.querySelector('#reader');
     const readerText = document.querySelector('#readerText');
     const saveNote = document.querySelector('#saveNote');
+    const pauseSpeech = document.querySelector('#pauseSpeech');
+    const stopSpeech = document.querySelector('#stopSpeech');
     const notesList = document.querySelector('#notesList');
     let notes = loadNotes();
     let activeCategory = 'todo';
     let openNoteId = null;
+    let speechParts = [];
+    let speechIndex = 0;
+    let speechStopped = true;
 
     function loadNotes() {
       try {
@@ -130,6 +145,69 @@
       return firstLine.length > 55 ? firstLine.slice(0, 55) + '…' : firstLine;
     }
 
+    function splitForSpeech(text) {
+      const sentences = text.match(/[^.!?…\n]+[.!?…\n]+|[^.!?…\n]+$/g) || [text];
+      const parts = [];
+      sentences.forEach(sentence => {
+        let rest = sentence.trim();
+        while (rest.length > 220) {
+          let cut = rest.lastIndexOf(' ', 220);
+          if (cut < 80) cut = 220;
+          parts.push(rest.slice(0, cut));
+          rest = rest.slice(cut).trim();
+        }
+        if (rest) parts.push(rest);
+      });
+      return parts;
+    }
+
+    function preferredVoice() {
+      const voices = speechSynthesis.getVoices();
+      return voices.find(voice => voice.lang.toLowerCase() === 'uk-ua') ||
+        voices.find(voice => voice.lang.toLowerCase().startsWith('uk')) || null;
+    }
+
+    function speakNext() {
+      if (speechStopped || speechIndex >= speechParts.length) {
+        if (speechIndex >= speechParts.length) stopSpeaking();
+        return;
+      }
+      const utterance = new SpeechSynthesisUtterance(speechParts[speechIndex]);
+      utterance.lang = 'uk-UA';
+      utterance.rate = 0.95;
+      const voice = preferredVoice();
+      if (voice) utterance.voice = voice;
+      utterance.onend = () => {
+        if (!speechStopped) {
+          speechIndex += 1;
+          speakNext();
+        }
+      };
+      utterance.onerror = event => {
+        if (event.error !== 'canceled' && event.error !== 'interrupted') stopSpeaking();
+      };
+      speechSynthesis.speak(utterance);
+    }
+
+    function startSpeaking(text) {
+      speechSynthesis.cancel();
+      speechParts = splitForSpeech(text);
+      speechIndex = 0;
+      speechStopped = false;
+      pauseSpeech.disabled = false;
+      stopSpeech.disabled = false;
+      pauseSpeech.textContent = 'Пауза';
+      speakNext();
+    }
+
+    function stopSpeaking() {
+      speechStopped = true;
+      speechSynthesis.cancel();
+      pauseSpeech.disabled = true;
+      stopSpeech.disabled = true;
+      pauseSpeech.textContent = 'Пауза';
+    }
+
     function openReader(text, noteId = null) {
       readerText.textContent = text;
       openNoteId = noteId;
@@ -139,9 +217,11 @@
       reader.setAttribute('aria-hidden', 'false');
       document.body.style.overflow = 'hidden';
       reader.scrollTop = 0;
+      startSpeaking(text);
     }
 
     function closeReader() {
+      stopSpeaking();
       reader.classList.remove('open');
       reader.setAttribute('aria-hidden', 'true');
       document.body.style.overflow = '';
@@ -208,6 +288,16 @@
     });
     readButton.addEventListener('click', () => openReader(textInput.value.trim()));
     document.querySelector('#closeReader').addEventListener('click', closeReader);
+    pauseSpeech.addEventListener('click', () => {
+      if (speechSynthesis.paused) {
+        speechSynthesis.resume();
+        pauseSpeech.textContent = 'Пауза';
+      } else {
+        speechSynthesis.pause();
+        pauseSpeech.textContent = 'Продовжити';
+      }
+    });
+    stopSpeech.addEventListener('click', stopSpeaking);
     saveNote.addEventListener('click', () => {
       if (openNoteId) return;
       const text = readerText.textContent.trim();
