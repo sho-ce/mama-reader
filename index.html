@@ -137,7 +137,6 @@
     let speechIndex = 0;
     let speechStopped = true;
     let speechPaused = false;
-    let speechLanguage = 'uk-UA';
 
     function loadNotes() {
       try {
@@ -156,6 +155,32 @@
       return firstLine.length > 55 ? firstLine.slice(0, 55) + '…' : firstLine;
     }
 
+    function splitByAlphabet(text) {
+      const runs = [];
+      let current = '';
+      let alphabet = '';
+
+      for (const character of text) {
+        const nextAlphabet = /[a-z]/i.test(character) ? 'latin' :
+          /[а-яіїєґёъыэ]/i.test(character) ? 'cyrillic' : '';
+
+        if (nextAlphabet && alphabet && nextAlphabet !== alphabet) {
+          if (current.trim()) runs.push(current.trim());
+          current = '';
+        }
+        current += character;
+        if (nextAlphabet) alphabet = nextAlphabet;
+      }
+
+      if (current.trim()) runs.push(current.trim());
+      return runs.map(part => ({
+        text: part,
+        language: /[a-z]/i.test(part) && !/[а-яіїєґёъыэ]/i.test(part)
+          ? 'en-US'
+          : detectSpeechLanguage(part)
+      }));
+    }
+
     function splitForSpeech(text) {
       const sentences = text.match(/[^.!?…\n]+[.!?…\n]+|[^.!?…\n]+$/g) || [text];
       const parts = [];
@@ -164,10 +189,10 @@
         while (rest.length > 220) {
           let cut = rest.lastIndexOf(' ', 220);
           if (cut < 80) cut = 220;
-          parts.push(rest.slice(0, cut));
+          parts.push(...splitByAlphabet(rest.slice(0, cut)));
           rest = rest.slice(cut).trim();
         }
-        if (rest) parts.push(rest);
+        if (rest) parts.push(...splitByAlphabet(rest));
       });
       return parts;
     }
@@ -210,10 +235,10 @@
         return;
       }
       const part = speechParts[speechIndex];
-      const utterance = new SpeechSynthesisUtterance(part);
-      utterance.lang = speechLanguage;
+      const utterance = new SpeechSynthesisUtterance(part.text);
+      utterance.lang = part.language;
       utterance.rate = 0.95;
-      const voice = preferredVoice(speechLanguage);
+      const voice = preferredVoice(part.language);
       if (voice) utterance.voice = voice;
       utterance.onend = () => {
         if (!speechStopped && !speechPaused) {
@@ -230,7 +255,6 @@
     async function startSpeaking(text) {
       speechSynthesis.cancel();
       speechParts = splitForSpeech(text);
-      speechLanguage = detectSpeechLanguage(text);
       speechIndex = 0;
       speechStopped = false;
       speechPaused = false;
