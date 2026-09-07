@@ -170,10 +170,36 @@
       return parts;
     }
 
-    function preferredVoice() {
+    function detectSpeechLanguage(text) {
+      const value = text.toLowerCase();
+      if (/[іїєґ]/.test(value)) return 'uk-UA';
+      if (/[ыэъё]/.test(value)) return 'ru-RU';
+
+      const words = value.match(/[а-яіїєґ]+/g) || [];
+      const ukrainian = new Set(['це', 'що', 'як', 'але', 'для', 'вона', 'він', 'вони', 'ми', 'ви', 'треба', 'можна', 'будь', 'дуже', 'ще', 'чи']);
+      const russian = new Set(['это', 'что', 'как', 'но', 'для', 'она', 'он', 'они', 'мы', 'вы', 'нужно', 'можно', 'быть', 'очень', 'ещё', 'или']);
+      const ukScore = words.filter(word => ukrainian.has(word)).length;
+      const ruScore = words.filter(word => russian.has(word)).length;
+      return ruScore > ukScore ? 'ru-RU' : 'uk-UA';
+    }
+
+    function preferredVoice(language) {
+      const prefix = language.slice(0, 2).toLowerCase();
       const voices = speechSynthesis.getVoices();
-      return voices.find(voice => voice.lang.toLowerCase() === 'uk-ua') ||
-        voices.find(voice => voice.lang.toLowerCase().startsWith('uk')) || null;
+      return voices.find(voice => voice.lang.toLowerCase() === language.toLowerCase()) ||
+        voices.find(voice => voice.lang.toLowerCase().startsWith(prefix)) || null;
+    }
+
+    function waitForVoices() {
+      if (speechSynthesis.getVoices().length) return Promise.resolve();
+      return new Promise(resolve => {
+        const finish = () => {
+          speechSynthesis.removeEventListener('voiceschanged', finish);
+          resolve();
+        };
+        speechSynthesis.addEventListener('voiceschanged', finish, { once: true });
+        setTimeout(finish, 1500);
+      });
     }
 
     function speakNext() {
@@ -181,10 +207,12 @@
         if (speechIndex >= speechParts.length) stopSpeaking();
         return;
       }
-      const utterance = new SpeechSynthesisUtterance(speechParts[speechIndex]);
-      utterance.lang = 'uk-UA';
+      const part = speechParts[speechIndex];
+      const language = detectSpeechLanguage(part);
+      const utterance = new SpeechSynthesisUtterance(part);
+      utterance.lang = language;
       utterance.rate = 0.95;
-      const voice = preferredVoice();
+      const voice = preferredVoice(language);
       if (voice) utterance.voice = voice;
       utterance.onend = () => {
         if (!speechStopped) {
@@ -198,7 +226,7 @@
       speechSynthesis.speak(utterance);
     }
 
-    function startSpeaking(text) {
+    async function startSpeaking(text) {
       speechSynthesis.cancel();
       speechParts = splitForSpeech(text);
       speechIndex = 0;
@@ -206,7 +234,8 @@
       pauseSpeech.disabled = false;
       stopSpeech.disabled = false;
       pauseSpeech.textContent = 'Пауза';
-      speakNext();
+      await waitForVoices();
+      if (!speechStopped) speakNext();
     }
 
     function stopSpeaking() {
