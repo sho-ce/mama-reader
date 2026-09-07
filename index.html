@@ -136,6 +136,7 @@
     let speechParts = [];
     let speechIndex = 0;
     let speechStopped = true;
+    let speechPaused = false;
 
     function loadNotes() {
       try {
@@ -203,7 +204,7 @@
     }
 
     function speakNext() {
-      if (speechStopped || speechIndex >= speechParts.length) {
+      if (speechStopped || speechPaused || speechIndex >= speechParts.length) {
         if (speechIndex >= speechParts.length) stopSpeaking();
         return;
       }
@@ -215,7 +216,7 @@
       const voice = preferredVoice(language);
       if (voice) utterance.voice = voice;
       utterance.onend = () => {
-        if (!speechStopped) {
+        if (!speechStopped && !speechPaused) {
           speechIndex += 1;
           speakNext();
         }
@@ -231,6 +232,7 @@
       speechParts = splitForSpeech(text);
       speechIndex = 0;
       speechStopped = false;
+      speechPaused = false;
       pauseSpeech.disabled = false;
       stopSpeech.disabled = false;
       pauseSpeech.textContent = 'Пауза';
@@ -240,6 +242,7 @@
 
     function stopSpeaking() {
       speechStopped = true;
+      speechPaused = false;
       speechSynthesis.cancel();
       pauseSpeech.disabled = true;
       stopSpeech.disabled = true;
@@ -327,15 +330,17 @@
     readButton.addEventListener('click', () => openReader(textInput.value.trim()));
     document.querySelector('#closeReader').addEventListener('click', closeReader);
     pauseSpeech.addEventListener('click', () => {
-      if (speechSynthesis.paused) {
-        speechSynthesis.resume();
+      if (speechPaused) {
+        speechPaused = false;
         pauseSpeech.textContent = 'Пауза';
+        speakNext();
       } else {
-        speechSynthesis.pause();
+        speechPaused = true;
+        speechSynthesis.cancel();
         pauseSpeech.textContent = 'Продовжити';
       }
     });
-    stopSpeech.addEventListener('click', stopSpeaking);
+    stopSpeech.addEventListener('click', closeReader);
     saveNote.addEventListener('click', () => {
       if (openNoteId) return;
       const text = readerText.textContent.trim();
