@@ -137,6 +137,7 @@
     let speechIndex = 0;
     let speechStopped = true;
     let speechPaused = false;
+    let speechLanguage = 'uk-UA';
 
     function loadNotes() {
       try {
@@ -209,11 +210,10 @@
         return;
       }
       const part = speechParts[speechIndex];
-      const language = detectSpeechLanguage(part);
       const utterance = new SpeechSynthesisUtterance(part);
-      utterance.lang = language;
+      utterance.lang = speechLanguage;
       utterance.rate = 0.95;
-      const voice = preferredVoice(language);
+      const voice = preferredVoice(speechLanguage);
       if (voice) utterance.voice = voice;
       utterance.onend = () => {
         if (!speechStopped && !speechPaused) {
@@ -230,6 +230,7 @@
     async function startSpeaking(text) {
       speechSynthesis.cancel();
       speechParts = splitForSpeech(text);
+      speechLanguage = detectSpeechLanguage(text);
       speechIndex = 0;
       speechStopped = false;
       speechPaused = false;
