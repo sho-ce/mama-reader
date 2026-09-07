@@ -199,16 +199,7 @@
     }
 
     function detectSpeechLanguage(text) {
-      const value = text.toLowerCase();
-      if (/[іїєґ]/.test(value)) return 'uk-UA';
-      if (/[ыэъё]/.test(value)) return 'ru-RU';
-
-      const words = value.match(/[а-яіїєґ]+/g) || [];
-      const ukrainian = new Set(['це', 'що', 'як', 'але', 'для', 'вона', 'він', 'вони', 'ми', 'ви', 'треба', 'можна', 'будь', 'дуже', 'ще', 'чи']);
-      const russian = new Set(['это', 'что', 'как', 'но', 'для', 'она', 'он', 'они', 'мы', 'вы', 'нужно', 'можно', 'быть', 'очень', 'ещё', 'или']);
-      const ukScore = words.filter(word => ukrainian.has(word)).length;
-      const ruScore = words.filter(word => russian.has(word)).length;
-      return ruScore > ukScore ? 'ru-RU' : 'uk-UA';
+      return /[а-яіїєґёъыэ]/i.test(text) ? 'ru-RU' : 'en-US';
     }
 
     function preferredVoice(language) {
