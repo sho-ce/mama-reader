@@ -137,6 +137,7 @@
     let speechIndex = 0;
     let speechStopped = true;
     let speechPaused = false;
+    let activeSpeechLanguage = '';
 
     function loadNotes() {
       try {
@@ -235,6 +236,7 @@
         return;
       }
       const part = speechParts[speechIndex];
+      activeSpeechLanguage = part.language;
       const utterance = new SpeechSynthesisUtterance(part.text);
       utterance.lang = part.language;
       utterance.rate = 0.95;
@@ -242,8 +244,11 @@
       if (voice) utterance.voice = voice;
       utterance.onend = () => {
         if (!speechStopped && !speechPaused) {
+          const previousLanguage = part.language;
           speechIndex += 1;
-          speakNext();
+          const nextPart = speechParts[speechIndex];
+          const languageChanged = nextPart && nextPart.language !== previousLanguage;
+          setTimeout(speakNext, languageChanged ? 350 : 40);
         }
       };
       utterance.onerror = event => {
@@ -256,6 +261,7 @@
       speechSynthesis.cancel();
       speechParts = splitForSpeech(text);
       speechIndex = 0;
+      activeSpeechLanguage = '';
       speechStopped = false;
       speechPaused = false;
       pauseSpeech.disabled = false;
